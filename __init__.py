@@ -6,23 +6,18 @@ from traceback import format_exc
 import logging
 # from csv import reader, DictReader
 # from contextlib import closing
-# from codecs import iterdecode
+from codecs import register, lookup # , iterdecode
+register(lambda name: lookup('utf-8') if name == 'cp65001' else None)
 from ts3 import query
 from telegram import Bot, ParseMode
 from fritzconnection import FritzConnection
+from config import *
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-csv_path = "versions.csv"
-csv_url = "https://raw.githubusercontent.com/ReSpeak/tsdeclarations/master/Versions.csv"
-servers = [ "telnet://[2001:1608:10:247::248]:10011" ]
-tg_token = '590081847:AAHgXTAU2A7sBxNEWo9g9s9fQ6ifKIPwbTQ';tg_chatid = -305312033
-
 running = False
 versions = list()
-tgbot = Bot(tg_token)
-fritzbox = FritzConnection(address="192.168.2.1",user="sysadmin",password="Bueffel911")
 
 class Version(object):
         version = None
@@ -72,6 +67,8 @@ versions = list(filter(None, versions))
 running = True
 
 while(running):
+        tgbot = Bot(tg_token)
+        fritzbox = FritzConnection(address=fritzbox_address,user=fritzbox_user,password=fritzbox_password)
         neednewip = False
         for server in servers:
                 try:
@@ -84,23 +81,24 @@ while(running):
                                                 clientinfo = ts3conn.query("clientinfo").params(clid=client["clid"]).first()
                                                 version = Version(clientinfo["client_version"], clientinfo["client_platform"], clientinfo["client_version_sign"])
                                                 version_str = ','.join([version.version,version.platform,version.sign])
-                                                if version_str in versions: sleep(3); continue
+                                                if version_str in versions: sleep(sleep_after_client); continue
                                                 versions.append(version_str)
-                                                with open(csv_path, "a") as f: f.write("\n"+version_str)
-                                                nick = client["client_nickname"];uid = clientinfo["client_unique_identifier"];uid_encoded = parse.quote_plus(uid)
+                                                with open(csv_path, "a") as f: f.write("\nStable,"+version_str)
+                                                nick = client["client_nickname"].encode('utf-8');uid = clientinfo["client_unique_identifier"] # ;uid_encoded = parse.quote_plus(uid)
                                                 msg_print = "New Version from \"{}\" (`{}`):".format(nick, uid)
-                                                msg_tg = "`[{}](https://ts3index.com/?page=searchclient&uid={})`".format(nick, uid_encoded)
-                                                print(msg_print, version_str)
+                                                msg_tg = "`{}` (`{}`):".format(nick, uid)
+                                                logger.info(msg_print, version_str)
                                                 tgbot.send_message(chat_id=tg_chatid, text=msg_tg + "\n```csv\n" + version_str + "\n```", parse_mode=ParseMode.MARKDOWN)
                                                 submitVersion(version)
-                                                sleep(2)
-                                        except: print(format_exc())
+                                                sleep(sleep_after_client_new_version)
+                                        except: print(format_exc()); continue
                 except Exception as err:
-                        if err == query.TS3TransportError:
-                                print("Connection blocked by firewall, changing IP and waiting 30s before next run...")
-                                neednewip = True
-                        else: print(format_exc())
+                        if isinstance(query.TS3TransportError, type(err)):
+                                logger.warning("Connection blocked by firewall, changing IP and waiting 30s before next run...")
+                                neednewip = True; continue
+                        elif isinstance(query.TS3QueryError, type(err)): logger.error(err); continue
+                        else: logger.error(format_exc()); continue
         if neednewip:
                 fritzbox.reconnect()
-                sleep(30)
-        else: sleep(600)
+                sleep(sleep_ipchange)
+        else: sleep(sleep_after_run)
