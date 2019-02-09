@@ -6,6 +6,7 @@ from traceback import format_exc
 import logging
 # from csv import reader, DictReader
 # from contextlib import closing
+from json import loads
 from codecs import register, lookup # , iterdecode
 register(lambda name: lookup('utf-8') if name == 'cp65001' else None)
 from ts3 import query
@@ -48,13 +49,14 @@ def getVersionsFromLocal():
                 return map(lambda it: it.strip().partition(",")[2], lines)
 
 def submitVersion(version, uid=None):
-        version_encoded = parse.quote_plus(version.version)
-        url = "https://splamy.de/api/teamspeak/version/{version}/{platform}".format(version=version_encoded, platform=version.platform)
+        # version.version = parse.quote_plus(version.version)
+        url = "https://splamy.de/api/teamspeak/version/{version}/{platform}".format(version=version.version, platform=version.platform)
         params = {"sign": version.sign}
         headers = { "Content-Type": "application/json" }
         if uid: headers["X-From-Client"] = uid
         r = post(url, params=params, data=bytearray(), headers=headers)
-        print(r.url, r.status_code, r.reason, r)
+        print("\"",r.url,"\"")
+        print(loads(r.text))
 
 try:
         versions = getVersionsFromRemote()
@@ -67,6 +69,8 @@ versions = list(filter(None, versions))
 
 # for version in versions: print(version)
 running = True
+
+# submitVersion(Version("0.0.1 [Build: 1549713549]", "Linux", "7XvKmrk7uid2ixHFeERGqcC8vupeQqDypLtw2lY9slDNPojEv//F47UaDLG+TmVk4r6S0TseIKefzBpiRtLDAQ=="), "SAJRnGpF2d4SAY2tbtf4JdDm2I4=")
 
 while(running):
         tgbot = Bot(tg_token)
