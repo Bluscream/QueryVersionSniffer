@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 from time import sleep
-from requests import Session, post # get
+from requests import post, get, Session
 from urllib import parse
 from traceback import format_exc
 import logging
@@ -13,9 +13,8 @@ from ts3 import query
 from telegram import Bot, ParseMode
 from fritzconnection import FritzConnection
 from config import *
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s|%(levelname)s\t| %(message)s') # \t|%(name)s
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 running = False
 versions = list()
@@ -32,11 +31,10 @@ def merge_no_duplicates(iterable_1, iterable_2):
     return list(myset)
 
 def getVersionsFromRemote():
-        with Session() as s:
-                download = s.get(csv_url)
-                decoded_content = download.content.decode('utf-8')
-                lines = decoded_content.splitlines()[1:]
-                return map(lambda it: it.strip().partition(",")[2], lines)
+        download = session.get(csv_url)
+        decoded_content = download.content.decode('utf-8')
+        lines = decoded_content.splitlines()[1:]
+        return map(lambda it: it.strip().partition(",")[2], lines)
         # noinspection PyUnreachableCode
         """
         with closing(get(csv_url, stream=True)) as r:
@@ -54,10 +52,11 @@ def submitVersion(version, uid=None):
         params = {"sign": version.sign}
         headers = { "Content-Type": "application/json" }
         if uid: headers["X-From-Client"] = uid
-        r = post(url, params=params, data=bytearray(), headers=headers)
+        r = session.post(url, params=params, data=bytearray(), headers=headers)
         print("\"",r.url,"\"")
         print(loads(r.text))
 
+session = Session()
 try:
         versions = getVersionsFromRemote()
         versions = merge_no_duplicates(versions, getVersionsFromLocal())
@@ -76,17 +75,24 @@ while(running):
         tgbot = Bot(tg_token)
         fritzbox = FritzConnection(address=fritzbox_address,user=fritzbox_user,password=fritzbox_password)
         neednewip = False
+        success = 0
         for server in servers:
+                success_clients = 0
                 try:
+                        logger.info("Now sniffing on {}".format(server))
                         with query.TS3ServerConnection(server[0]) as ts3conn:
                                 ts3conn.exec_("use", port=server[1])
                                 clientlist = ts3conn.exec_("clientlist")
                                 for client in clientlist:
                                         try:
                                                 if (client["client_type"] != "0"): continue
+                                                logger.debug(client)
+                                                # logger.debug("CLIENT clid: {} dbid: {} name: {} ")
                                                 clientinfo = ts3conn.query("clientinfo").params(clid=client["clid"]).first()
+                                                logger.debug(clientinfo)
                                                 version = Version(clientinfo["client_version"], clientinfo["client_platform"], clientinfo["client_version_sign"])
                                                 version_str = ','.join([version.version,version.platform,version.sign])
+                                                success_clients += 1
                                                 if version_str in versions: sleep(sleep_after_client); continue
                                                 versions.append(version_str)
                                                 with open(csv_path, "a") as f: f.write("\nStable,"+version_str)
@@ -99,10 +105,13 @@ while(running):
                                                 sleep(sleep_after_client_new_version)
                                         except query.TS3QueryError as err: logger.error(err.args[0]); continue
                                         except: logger.error(format_exc()); continue
+                                logger.info("Successfully sniffed {}/{} clients".format(success_clients, len(clientlist)))
+                                success += 1
                 except query.TS3TransportError as err:
                         logger.warning("Connection blocked by firewall, changing IP and waiting 30s before next run...")
                         neednewip = True; continue
                 except: logger.error(format_exc()); continue
+        logger.info("Successfully sniffed {}/{} servers".format(success, len(servers)))
         if neednewip:
                 fritzbox.reconnect()
                 sleep(sleep_ipchange)
