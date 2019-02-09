@@ -72,6 +72,7 @@ versions = list(filter(None, versions))
 running = True
 
 while(running):
+        neednewip = False
         for server in servers:
                 try:
                         with query.TS3ServerConnection(server) as ts3conn:
@@ -96,8 +97,10 @@ while(running):
                                         except: print(format_exc())
                 except Exception as err:
                         if err == query.TS3TransportError:
-                                print("Connection blocked by firewall, changing IP and waiting 30s...")
-                                fritzbox.reconnect()
-                                sleep(30)
+                                print("Connection blocked by firewall, changing IP and waiting 30s before next run...")
+                                neednewip = True
                         else: print(format_exc())
-        sleep(600)
+        if neednewip:
+                fritzbox.reconnect()
+                sleep(30)
+        else: sleep(600)
