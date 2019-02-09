@@ -72,8 +72,8 @@ while(running):
         neednewip = False
         for server in servers:
                 try:
-                        with query.TS3ServerConnection(server) as ts3conn:
-                                ts3conn.exec_("use", port=9987)
+                        with query.TS3ServerConnection(server[0]) as ts3conn:
+                                ts3conn.exec_("use", port=server[1])
                                 clientlist = ts3conn.exec_("clientlist")
                                 for client in clientlist:
                                         try:
@@ -95,7 +95,7 @@ while(running):
                 except query.TS3TransportError as err:
                         logger.warning("Connection blocked by firewall, changing IP and waiting 30s before next run...")
                         neednewip = True; continue
-                except query.TS3QueryError as err: logger.error(err); continue
+                except query.TS3QueryError as err: logger.error(err.args); continue
                 except: logger.error(format_exc()); continue
         if neednewip:
                 fritzbox.reconnect()
