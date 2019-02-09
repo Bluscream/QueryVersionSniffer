@@ -51,8 +51,8 @@ def submitVersion(version, uid=None):
         version_encoded = parse.quote_plus(version.version)
         url = "https://splamy.de/api/teamspeak/version/{version}/{platform}".format(version=version_encoded, platform=version.platform)
         params = {"sign": version.sign}
-        headers = dict()
-        if uid: headers = { "X-From-Client": uid}
+        headers = { "Content-Type": "application/json" }
+        if uid: headers["X-From-Client"] = uid
         r = post(url, params=params, data=bytearray(), headers=headers)
         print(r.url, r.status_code, r.reason, r)
 
