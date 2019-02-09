@@ -92,12 +92,11 @@ while(running):
                                                 submitVersion(version)
                                                 sleep(sleep_after_client_new_version)
                                         except: print(format_exc()); continue
-                except Exception as err:
-                        if isinstance(query.TS3TransportError, type(err)):
-                                logger.warning("Connection blocked by firewall, changing IP and waiting 30s before next run...")
-                                neednewip = True; continue
-                        elif isinstance(query.TS3QueryError, type(err)): logger.error(err); continue
-                        else: logger.error(format_exc()); continue
+                except query.TS3TransportError as err:
+                        logger.warning("Connection blocked by firewall, changing IP and waiting 30s before next run...")
+                        neednewip = True; continue
+                except query.TS3QueryError as err: logger.error(err); continue
+                except: logger.error(format_exc()); continue
         if neednewip:
                 fritzbox.reconnect()
                 sleep(sleep_ipchange)
