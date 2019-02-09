@@ -47,11 +47,13 @@ def getVersionsFromLocal():
                 lines = f.readlines()[1:]
                 return map(lambda it: it.strip().partition(",")[2], lines)
 
-def submitVersion(version):
+def submitVersion(version, uid=None):
         version_encoded = parse.quote_plus(version.version)
         url = "https://splamy.de/api/teamspeak/version/{version}/{platform}".format(version=version_encoded, platform=version.platform)
         params = {"sign": version.sign}
-        r = post(url, params=params, data=bytearray())
+        headers = dict()
+        if uid: headers = { "X-From-Client": uid}
+        r = post(url, params=params, data=bytearray(), headers=headers)
         print(r.url, r.status_code, r.reason, r)
 
 try:
@@ -84,14 +86,15 @@ while(running):
                                                 if version_str in versions: sleep(sleep_after_client); continue
                                                 versions.append(version_str)
                                                 with open(csv_path, "a") as f: f.write("\nStable,"+version_str)
-                                                nick = client["client_nickname"].encode('utf-8');uid = clientinfo["client_unique_identifier"] # ;uid_encoded = parse.quote_plus(uid)
-                                                msg_print = "New Version from \"{}\" (`{}`):".format(nick, uid)
+                                                nick = client["client_nickname"];uid = clientinfo["client_unique_identifier"] # ;uid_encoded = parse.quote_plus(uid)
+                                                msg_print = "New Version from \"{}\" (`{}`):".format(nick.encode('utf-8'), uid)
                                                 msg_tg = "`{}` (`{}`):".format(nick, uid)
                                                 logger.info(msg_print, version_str)
                                                 tgbot.send_message(chat_id=tg_chatid, text=msg_tg + "\n```csv\n" + version_str + "\n```", parse_mode=ParseMode.MARKDOWN)
-                                                submitVersion(version)
+                                                submitVersion(version, uid)
                                                 sleep(sleep_after_client_new_version)
-                                        except query.TS3QueryError as err: logger.error(err.args); continue
+                                        except query.TS3QueryError as err: logger.error(err.args[0]); continue
+                                        except: logger.error(format_exc()); continue
                 except query.TS3TransportError as err:
                         logger.warning("Connection blocked by firewall, changing IP and waiting 30s before next run...")
                         neednewip = True; continue
