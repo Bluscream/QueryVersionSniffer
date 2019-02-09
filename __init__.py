@@ -7,9 +7,10 @@ import logging
 # from csv import reader, DictReader
 # from contextlib import closing
 from json import loads
+from re import compile, match, search
 from codecs import register, lookup # , iterdecode
 register(lambda name: lookup('utf-8') if name == 'cp65001' else None)
-from ts3 import query
+from ts3 import query, response
 from telegram import Bot, ParseMode
 from fritzconnection import FritzConnection
 from config import *
@@ -18,13 +19,26 @@ logger = logging.getLogger()
 
 running = False
 versions = list()
+version_pattern = compile(r"3(?:\.\d+)* \[Build: \d+\]")
+sign_pattern = compile(r"[A-z0-9\/\+]{86}==")
+platforms = ["Windows","Linux","OS X","Android","iOS"]
 
 class Version(object):
+        valid_version = False
         version = None
+        valid_platform = False
         platform = None
+        valid_sign =False
         sign = None
         def __init__(self, version, platform, sign):
-                self.version = version; self.platform = platform; self.sign = sign
+                version_match = search(version_pattern, version)
+                if (version_match):  self.version = version_match.string; self.valid_version = True
+                else: self.version = version
+                self.platform = platform
+                self.valid_platform = platform in platforms
+                sign_match = search(sign_pattern, sign)
+                if (sign_match): self.sign = sign_match.string; self.valid_sign = True
+                else: self.sign = sign
 
 def merge_no_duplicates(iterable_1, iterable_2):
     myset = set(iterable_1).union(set(iterable_2))
@@ -76,6 +90,7 @@ while(running):
         fritzbox = FritzConnection(address=fritzbox_address,user=fritzbox_user,password=fritzbox_password)
         neednewip = False
         success = 0
+        logger.info("Started sniffing {} servers".format(len(servers)))
         for server in servers:
                 success_clients = 0
                 try:
@@ -83,15 +98,24 @@ while(running):
                         with query.TS3ServerConnection(server[0]) as ts3conn:
                                 ts3conn.exec_("use", port=server[1])
                                 clientlist = ts3conn.exec_("clientlist")
+                                if (clientlist.error["id"]!= "0" or clientlist.error["msg"] != "ok"):
+                                        logger.error("Unable to get clientlist: {}".format(clientlist.error))
+                                        continue
                                 for client in clientlist:
                                         try:
                                                 if (client["client_type"] != "0"): continue
                                                 logger.debug(client)
                                                 # logger.debug("CLIENT clid: {} dbid: {} name: {} ")
-                                                clientinfo = ts3conn.query("clientinfo").params(clid=client["clid"]).first()
-                                                logger.debug(clientinfo)
+                                                clientinfo = ts3conn.exec_("clientinfo", clid=client["clid"])
+                                                if (clientinfo.error["id"] != "0" or clientinfo.error["msg"] != "ok"):
+                                                        logger.error( "Unable to get clientinfo for client \"{}\" ({}): {}".format(client["client_nickname"], client["clid"], clientinfo.error))
+                                                        continue
+                                                clientinfo = clientinfo.parsed[0]
+                                                # logger.info(clientinfo)
                                                 version = Version(clientinfo["client_version"], clientinfo["client_platform"], clientinfo["client_version_sign"])
+                                                # print("ver:",version.valid_version, "platform:",version.valid_platform, "sign:",version.valid_sign)
                                                 version_str = ','.join([version.version,version.platform,version.sign])
+                                                # print(version_str)
                                                 success_clients += 1
                                                 if version_str in versions: sleep(sleep_after_client); continue
                                                 versions.append(version_str)
