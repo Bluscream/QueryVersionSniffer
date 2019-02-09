@@ -17,12 +17,12 @@ logger.setLevel(logging.INFO)
 csv_path = "versions.csv"
 csv_url = "https://raw.githubusercontent.com/ReSpeak/tsdeclarations/master/Versions.csv"
 servers = [ "telnet://[2001:1608:10:247::248]:10011" ]
-tg_token = '590081847:'
+tg_token = '590081847:AAHgXTAU2A7sBxNEWo9g9s9fQ6ifKIPwbTQ';tg_chatid = -305312033
 
 running = False
 versions = list()
 tgbot = Bot(tg_token)
-fritzbox = FritzConnection(address="192.168.2.1",user="sysadmin",password="")
+fritzbox = FritzConnection(address="192.168.2.1",user="sysadmin",password="Bueffel911")
 
 class Version(object):
         version = None
@@ -63,6 +63,7 @@ try:
         versions = getVersionsFromRemote()
         versions = merge_no_duplicates(versions, getVersionsFromLocal())
 except: versions = getVersionsFromLocal()
+versions = list(filter(None, versions))
 
 # updater.start_polling()
 # updater.idle()
@@ -84,10 +85,12 @@ while(running):
                                                 version_str = ','.join([version.version,version.platform,version.sign])
                                                 if version_str in versions: sleep(3); continue
                                                 versions.append(version_str)
-                                                newver = "New Version from"
-                                                newversion = "\"`" + client["client_nickname"] + "`\" (`" + clientinfo["client_unique_identifier"] + "`):"
-                                                print(newver, newversion, version_str)
-                                                tgbot.send_message(chat_id=-305312033, text=newversion + "\n```csv\n" + version_str + "\n```", parse_mode=ParseMode.MARKDOWN)
+                                                with open(csv_path, "a") as f: f.write("\n"+version_str)
+                                                nick = client["client_nickname"];uid = clientinfo["client_unique_identifier"];uid_encoded = parse.quote_plus(uid)
+                                                msg_print = "New Version from \"{}\" (`{}`):".format(nick, uid)
+                                                msg_tg = "`[{}](https://ts3index.com/?page=searchclient&uid={})`".format(nick, uid_encoded)
+                                                print(msg_print, version_str)
+                                                tgbot.send_message(chat_id=tg_chatid, text=msg_tg + "\n```csv\n" + version_str + "\n```", parse_mode=ParseMode.MARKDOWN)
                                                 submitVersion(version)
                                                 sleep(2)
                                         except: print(format_exc())
