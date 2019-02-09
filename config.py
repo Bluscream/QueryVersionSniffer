@@ -1,4 +1,4 @@
-servers = [ "telnet://[2001:1608:10:247::248]:10011" ]
+servers = [ ("telnet://[2001:1608:10:247::248]:10011", 9987) ]
 
 csv_path = "versions.csv"
 csv_url = "https://raw.githubusercontent.com/ReSpeak/tsdeclarations/master/Versions.csv"
