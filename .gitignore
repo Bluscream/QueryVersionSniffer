@@ -104,4 +104,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-# /config.py
+.idea/workspace.xml
+/config.py
+config.py
