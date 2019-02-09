@@ -91,11 +91,10 @@ while(running):
                                                 tgbot.send_message(chat_id=tg_chatid, text=msg_tg + "\n```csv\n" + version_str + "\n```", parse_mode=ParseMode.MARKDOWN)
                                                 submitVersion(version)
                                                 sleep(sleep_after_client_new_version)
-                                        except: print(format_exc()); continue
+                                        except query.TS3QueryError as err: logger.error(err.args); continue
                 except query.TS3TransportError as err:
                         logger.warning("Connection blocked by firewall, changing IP and waiting 30s before next run...")
                         neednewip = True; continue
-                except query.TS3QueryError as err: logger.error(err.args); continue
                 except: logger.error(format_exc()); continue
         if neednewip:
                 fritzbox.reconnect()
