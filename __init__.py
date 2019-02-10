@@ -101,6 +101,9 @@ while(running):
                                 if (clientlist.error["id"]!= "0" or clientlist.error["msg"] != "ok"):
                                         logger.error("Unable to get clientlist: {}".format(clientlist.error))
                                         continue
+                                if (len(clientlist) < 2):
+                                        logger.info("Skipping because no one else is online!")
+                                        continue
                                 for client in clientlist:
                                         try:
                                                 if (client["client_type"] != "0"): continue
